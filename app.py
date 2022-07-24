@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import Column, Integer, String, Float
 import os
+from flask_marshmallow import Marshmallow
 
 app = Flask(__name__)
 basedir = os.path.abspath(os.path.dirname(__file__))
@@ -9,6 +10,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + \
     os.path.join(basedir, 'planets.db')
 
 db = SQLAlchemy(app)
+ma = Marshmallow(app)
 
 # create database via flask cli
 
@@ -86,6 +88,13 @@ def url_variable(name: str, age: int):
     else:
         return jsonify(message="Welcome, " + name)
 
+
+@app.route('/planets', methods=['GET'])
+def planets():
+    planets_list = Planet.query.all()
+    result = planets_schema.dump(planets_list)
+    return jsonify(result)
+
 # database model
 
 
@@ -107,3 +116,21 @@ class Planet(db.Model):
     mass = Column(Float)
     radius = Column(Float)
     distance = Column(Float)
+
+
+class UserSchema(ma.Schema):
+    class Meta:
+        fields = ('id', 'first_name', 'last_name', 'email', 'password')
+
+
+class PlanetSchema(ma.Schema):
+    class Meta:
+        fields = ('planet_id', 'planet_name', 'planet_type',
+                  'home_star', 'mass', 'radius', 'distance')
+
+
+user_schema = UserSchema()  # singular
+users_schema = UserSchema(many=True)  # plural
+
+planet_schema = PlanetSchema()  # singular
+planets_schema = PlanetSchema(many=True)  # plural
