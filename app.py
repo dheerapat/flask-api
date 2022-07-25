@@ -10,11 +10,12 @@ app = Flask(__name__)
 basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + \
     os.path.join(basedir, 'planets.db')
-app.config['JWT_SECRET_KEY']= 'supersecret' # TODO: change this before deploy!
-app.config['MAIL_SERVER']='smtp.mailtrap.io'
+# TODO: change this before deploy!
+app.config['JWT_SECRET_KEY'] = 'supersecret'
+app.config['MAIL_SERVER'] = 'smtp.mailtrap.io'
 app.config['MAIL_PORT'] = 2525
-app.config['MAIL_USERNAME'] = '' # TODO: add credential
-app.config['MAIL_PASSWORD'] = '' # TODO: add credential
+app.config['MAIL_USERNAME'] = ''  # TODO: add credential
+app.config['MAIL_PASSWORD'] = ''  # TODO: add credential
 app.config['MAIL_USE_TLS'] = True
 app.config['MAIL_USE_SSL'] = False
 
@@ -123,6 +124,7 @@ def register():
         db.session.commit()
         return jsonify(message='User created.'), 201
 
+
 @app.route('/login', methods=['POST'])
 def login():
     if request.is_json:
@@ -131,7 +133,7 @@ def login():
     else:
         email = request.form['email']
         password = request.form['password']
-    
+
     test = User.query.filter_by(email=email, password=password).first()
     if test:
         access_token = create_access_token(identity=email)
@@ -139,17 +141,81 @@ def login():
     else:
         return jsonify(message='Bad E-mail or Password'), 401
 
+
 @app.route('/retrieve_password/<string:email>', methods=['GET'])
 def retrieve_password(email: str):
     user = User.query.filter_by(email=email).first()
     if user:
         msg = Message("You planetary API pass is "+user.password,
-        sender="admin@planetary.com",
-        recipients=[email])
+                      sender="admin@planetary.com",
+                      recipients=[email])
         mail.send(msg)
         return jsonify(message="Password send to "+email)
     else:
         return jsonify(message="That E-mail doesn't exist"), 401
+
+
+@app.route('/planet_details/<int:planet_id>', methods=['GET'])
+def planet_details(planet_id: int):
+    planet = Planet.query.filter_by(planet_id=planet_id).first()
+    if planet:
+        result = planet_schema.dump(planet)
+        return jsonify(result)
+    else:
+        return jsonify(message="Result not found"), 404
+
+
+@app.route('/add_planet', methods=["POST"])
+@jwt_required()
+def add_planet():
+    planet_name = request.form['planet_name']
+    test = Planet.query.filter_by(planet_name=planet_name).first()
+    if test:
+        return jsonify(message="Already have this planet."), 409
+    else:
+        planet_type = request.form['planet_type']
+        home_star = request.form['home_star']
+        mass = float(request.form['mass'])
+        radius = float(request.form['radius'])
+        distance = float(request.form['distance'])
+
+        new_planet = Planet(planet_name=planet_name, planet_type=planet_type,
+                            home_star=home_star, mass=mass, radius=radius, distance=distance)
+
+        db.session.add(new_planet)
+        db.session.commit()
+        return jsonify(message="Planet added."), 201
+
+
+@app.route('/update_planet', methods=['PUT'])
+@jwt_required()
+def update_planet():
+    planet_id = int(request.form['planet_id'])
+    planet = Planet.query.filter_by(planet_id=planet_id).first()
+    if planet:
+        planet.planet_name = request.form['planet_name']
+        planet.planet_type = request.form['planet_type']
+        planet.home_star = request.form['home_star']
+        planet.mass = float(request.form['mass'])
+        planet.radius = float(request.form['radius'])
+        planet.distance = float(request.form['distance'])
+
+        db.session.commit()
+        return jsonify(message="Planet updated."), 202
+    else:
+        return jsonify(message="No planet."), 404
+
+
+@app.route('/remove_planet/<int:planet_id>', methods=['DELETE'])
+@jwt_required()
+def remove_planet(planet_id: int):
+    planet = Planet.query.filter_by(planet_id=planet_id).first()
+    if planet:
+        db.session.delete(planet)
+        db.session.commit()
+        return jsonify(message="Planet deleted"), 202
+    else:
+        return jsonify(message="No Planet"), 404
 
 # database model
 
